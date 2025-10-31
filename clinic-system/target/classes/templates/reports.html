@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Reports & Analytics</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    :root{--bg:#0f172a;--card:#1f2937;--text:#e5e7eb;--muted:#9ca3af;--accent:#22c55e;--border:#374151;--radius:12px}
+    body{background:var(--bg);color:var(--text);font-family:system-ui;padding:24px}
+    .container{max-width:1000px;margin:auto}
+    .card{background:var(--card);border:1px solid var(--border);padding:18px;border-radius:var(--radius)}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+    .stat{font-size:28px;font-weight:800}
+    .muted{color:var(--muted)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.04);text-align:left}
+    .chart-placeholder{height:220px;border-radius:10px;background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));display:flex;align-items:center;justify-content:center;color:var(--muted)}
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Reports & Analytics</h1>
+
+  <div class="grid">
+    <div class="card">
+      <div class="muted">Total Patients</div>
+      <div id="totalPatients" class="stat" th:text="${totalPatients}">0</div>
+    </div>
+    <div class="card">
+      <div class="muted">Total Doctors</div>
+      <div id="totalDoctors" class="stat" th:text="${totalDoctors}">0</div>
+    </div>
+    <div class="card">
+      <div class="muted">Medical Records</div>
+      <div id="totalRecords" class="stat" th:text="${totalRecords}">0</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Today's Appointments</h3>
+    <div id="apptPlaceholder" class="chart-placeholder">Loading...</div>
+    <table id="apptTable" style="margin-top:12px;display:none">
+      <thead><tr><th>Time</th><th>Patient</th><th>Doctor</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  async function loadSummary(){
+    try {
+      const res = await fetch('/api/stats/summary');
+      if(!res.ok) throw new Error('No stats');
+      const s = await res.json();
+      document.getElementById('totalPatients').textContent = s.totalPatients ?? 0;
+      document.getElementById('totalDoctors').textContent = s.totalDoctors ?? 0;
+      document.getElementById('totalRecords').textContent = s.totalRecords ?? 0;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function loadTodayAppointments(){
+    try {
+      const res = await fetch('/api/stats/todayAppointments');
+      if(!res.ok) { document.getElementById('apptPlaceholder').textContent = 'No data'; return; }
+      const list = await res.json();
+      if(!list || list.length === 0) { document.getElementById('apptPlaceholder').textContent = 'No appointments today'; return; }
+      document.getElementById('apptPlaceholder').style.display='none';
+      document.getElementById('apptTable').style.display='table';
+      const tbody = document.querySelector('#apptTable tbody');
+      tbody.innerHTML = '';
+      list.forEach(a=> {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${new Date(a.appointmentDateTime).toLocaleString()}</td>
+                        <td>${a.patient?.firstName ? a.patient.firstName + ' ' + (a.patient.lastName||'') : (a.patientId || '')}</td>
+                        <td>${a.doctor?.firstName ? a.doctor.firstName + ' ' + (a.doctor.lastName||'') : (a.doctorId || '')}</td>
+                        <td>${a.status || 'PENDING'}</td>`;
+        tbody.appendChild(tr);
+      });
+    } catch(e){
+      console.error(e);
+      document.getElementById('apptPlaceholder').textContent = 'Failed to load';
+    }
+  }
+
+  loadSummary();
+  loadTodayAppointments();
+</script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <title>Patient Profile</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <style>
+        /* small theme-consistent styles; keep same variables used elsewhere */
+        :root{--card:#1f2937;--text:#e5e7eb;--muted:#9ca3af;--border:#374151;--radius:12px}
+        body{background:#0f172a;color:var(--text);font-family:system-ui;padding:24px}
+        .container{max-width:1000px;margin:auto}
+        .card{background:var(--card);border:1px solid var(--border);padding:18px;border-radius:var(--radius)}
+        .row{display:flex;gap:18px}
+        .col{flex:1}
+        .small{color:var(--muted);font-size:13px}
+        button{padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+        .btn-primary{background:#22c55e;color:#001a09}
+        table{width:100%;border-collapse:collapse;margin-top:12px}
+        th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.04);text-align:left}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card" id="profileCard">
+        <div class="row">
+            <div class="col">
+                <h2 id="name">Patient Name</h2>
+                <div class="small" id="contact">Email · Phone · DOB</div>
+                <p id="address"></p>
+            </div>
+            <div style="width:260px;text-align:right">
+                <button class="btn-primary" id="bookBtn">Book Appointment</button>
+                <button id="editBtn" style="margin-left:8px">Edit</button>
+            </div>
+        </div>
+
+        <h3 style="margin-top:18px">Medical Records</h3>
+        <table id="recordsTable">
+            <thead><tr><th>Date</th><th>Type</th><th>Summary</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+        </table>
+
+        <h4 style="margin-top:14px">Add Quick Note</h4>
+        <form id="quickNoteForm">
+            <input id="noteTitle" placeholder="Title" style="width:40%;padding:8px;border-radius:6px;border:1px solid var(--border)"/>
+            <input id="noteText" placeholder="Short description" style="width:55%;padding:8px;border-radius:6px;border:1px solid var(--border);margin-left:6px"/>
+            <button class="btn-primary" type="submit" style="margin-left:8px">Save</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    (() => {
+      const id = new URLSearchParams(window.location.search).get('id'); // patient id
+      if (!id) { alert('Patient id required in URL ?id='); return; }
+
+      const $ = (s) => document.getElementById(s);
+      async function loadProfile() {
+        const res = await fetch(`/api/patients/${id}`);
+        if(!res.ok){ alert('Failed to load patient'); return; }
+        const p = await res.json();
+        $('name').textContent = (p.firstName || '') + ' ' + (p.lastName || '');
+        $('contact').textContent = `${p.email || '-'} · ${p.phone || '-'} · ${p.dob || '-'}`;
+        $('address').textContent = p.address || '';
+        await loadRecords();
+      }
+
+      async function loadRecords(){
+        // require: endpoint GET /api/patients/{id}/records returning list
+        const res = await fetch(`/api/patients/${id}/records`);
+        if(!res.ok) return;
+        const list = await res.json();
+        const tbody = document.querySelector('#recordsTable tbody');
+        tbody.innerHTML = '';
+        list.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${r.date || ''}</td>
+                          <td>${r.type || ''}</td>
+                          <td>${r.summary || ''}</td>
+                          <td>
+                            <button onclick="viewRecord(${r.id})">View</button>
+                            <button onclick="deleteRecord(${r.id})" style="margin-left:6px">Delete</button>
+                          </td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      // quick note create: POST /api/patients/{id}/records
+      document.getElementById('quickNoteForm').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const payload = { type: 'Note', summary: document.getElementById('noteText').value, title: document.getElementById('noteTitle').value };
+        const res = await fetch(`/api/patients/${id}/records`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        if(!res.ok){ alert('Failed'); return; }
+        document.getElementById('noteTitle').value=''; document.getElementById('noteText').value='';
+        loadRecords();
+      });
+
+      window.viewRecord = (rid) => { window.location.href = `/medical_record_view.html?id=${rid}`; }
+      window.deleteRecord = async (rid) => { if(!confirm('Delete?')) return; await fetch(`/api/medicalrecords/${rid}`,{method:'DELETE'}); loadRecords(); }
+
+      // Book appointment => open booking page with patient preselected
+      document.getElementById('bookBtn').addEventListener('click', ()=> window.location.href = `/appointments?id=${id}`);
+
+      loadProfile();
+    })();
+</script>
+</body>
+</html>

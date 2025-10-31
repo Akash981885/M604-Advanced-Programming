@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Clinic System - Home</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- ===== Inline CSS Matching All Pages ===== -->
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #111827;
+            --card: #1f2937;
+            --text: #e5e7eb;
+            --muted: #9ca3af;
+            --accent: #22c55e;
+            --accent-dark: #16a34a;
+            --blue: #3b82f6;
+            --purple: #8b5cf6;
+            --red: #ef4444;
+            --border: #374151;
+            --radius: 14px;
+            --shadow: 0 10px 25px rgba(0, 0, 0, .35), 0 4px 10px rgba(0, 0, 0, .2);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 40px 20px;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 800;
+        }
+        p {
+            color: var(--muted);
+            margin-bottom: 25px;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 26px;
+        }
+        nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        nav a {
+            display: block;
+            text-decoration: none;
+            color: #fff;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: 700;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+        nav a:hover {
+            transform: translateY(-2px);
+        }
+        .patients { background: var(--accent); }
+        .patients:hover { background: var(--accent-dark); }
+
+        .doctors { background: var(--blue); }
+        .doctors:hover { background: #1d4ed8; }
+
+        .appointments { background: var(--purple); }
+        .appointments:hover { background: #7c3aed; }
+
+        .records { background: var(--red); }
+        .records:hover { background: #dc2626; }
+
+        .reports { background: #6b7280; }
+        .reports:hover { background: #4b5563; }
+
+        .footer {
+            margin-top: 20px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h1>Clinic Management System</h1>
+        <p>Select an option below to manage clinic data</p>
+
+        <nav>
+            <ul>
+                <li><a href="/patients" class="patients">Manage Patients</a></li>
+                <li><a href="/doctors" class="doctors">Manage Doctors</a></li>
+                <li><a href="/appointments" class="appointments">Manage Appointments</a></li>
+                <li><a href="/medical-records" class="records">Manage Medical Records</a></li>
+                <li><a href="/reports" class="reports">Reports & Analytics</a></li>
+                <li><a href="/swagger-ui.html" style="background:#374151;">API Docs (Swagger)</a></li>
+            </ul>
+        </nav>
+
+        <div class="footer">
+            © 2025 Clinic System | All Rights Reserved
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Appointments</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <style>
+        :root{
+          --bg:#0f172a; --panel:#111827; --card:#1f2937; --text:#e5e7eb; --muted:#9ca3af;
+          --accent:#3b82f6; --accent-dark:#1d4ed8; --green:#22c55e; --danger:#ef4444;
+          --border:#374151; --radius:14px; --shadow:0 10px 25px rgba(0,0,0,.35),0 4px 10px rgba(0,0,0,.2);
+        }
+        *{box-sizing:border-box}
+        body{margin:0;background:var(--bg);color:var(--text);min-height:100vh;padding:32px 18px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Helvetica Neue,Arial}
+        .container{max-width:1100px;margin:auto}
+        .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+        .title{font-size:28px;font-weight:800}
+        .nav a{color:var(--muted);margin-left:16px;text-decoration:none;font-weight:600}
+        .nav a:hover{color:var(--text)}
+        .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}
+        @media(max-width:980px){.grid{grid-template-columns:1fr}}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+
+        h2{margin:0 0 12px 0}
+        label{display:block;margin:10px 0 6px;color:var(--muted)}
+        input,select{width:100%;padding:10px;border-radius:10px;background:var(--panel);color:var(--text);border:1px solid var(--border)}
+        input:focus,select:focus{border-color:var(--accent);outline:none}
+        .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        @media(max-width:620px){.row{grid-template-columns:1fr}}
+        .actions{margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+        .btn{border:none;border-radius:8px;padding:8px 12px;cursor:pointer;font-weight:700;font-size:13px}
+        .btn-primary{background:var(--accent);color:#e6f0ff}
+        .btn-primary:hover{background:var(--accent-dark)}
+        .btn-green{background:var(--green);color:#062b12}
+        .btn-red{background:var(--danger);color:#fff}
+        .btn-ghost{background:rgba(156,163,175,.15);color:var(--text);border:1px solid var(--border)}
+        .status{font-size:13px;color:var(--muted);min-height:18px}
+        .status.ok{color:#86efac}
+        .status.err{color:#fca5a5}
+        .pill{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:rgba(156,163,175,.12);font-size:12px}
+
+        table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--border);background:rgba(31,41,55,.6);border-radius:12px;overflow:hidden}
+        thead th{padding:12px;background:rgba(55,65,81,.6);color:var(--muted);text-align:left}
+        tbody td{padding:12px;border-bottom:1px solid var(--border)}
+        tbody tr:hover{background:rgba(55,65,81,.25)}
+        .toolbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+        .toolbar .field{min-width:200px;flex:1}
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <div class="title">Appointments</div>
+        <div class="nav">
+            <a href="/">Home</a>
+            <a href="/patients">Patients</a>
+            <a href="/doctors">Doctors</a>
+            <a href="/swagger-ui.html">API Docs</a>
+        </div>
+    </div>
+
+    <div class="grid">
+        <!-- ===== List & Manage Appointments ===== -->
+        <section class="card">
+            <h2>Appointments <span class="pill" id="countPill">—</span></h2>
+
+            <div class="toolbar">
+                <div class="field">
+                    <label for="filterDoctor">Filter by Doctor</label>
+                    <select id="filterDoctor">
+                        <option value="">-- Select Doctor --</option>
+                        <option th:each="d : ${doctors}" th:value="${d.id}" th:text="${d.firstName + ' ' + d.lastName}"></option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="fromDate">From</label>
+                    <input id="fromDate" type="datetime-local" />
+                </div>
+                <div class="field">
+                    <label for="toDate">To</label>
+                    <input id="toDate" type="datetime-local" />
+                </div>
+                <div class="actions">
+                    <button class="btn btn-primary" id="loadBtn">Load</button>
+                    <button class="btn btn-ghost" id="clearBtn">Clear</button>
+                    <span id="listStatus" class="status"></span>
+                </div>
+            </div>
+
+            <div style="overflow:auto">
+                <table id="apptTable">
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Patient</th>
+                        <th>Doctor</th>
+                        <th>When</th>
+                        <th>Status</th>
+                        <th>Notes</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <!-- rows will be injected by JS; you can also render initial ones via Thymeleaf if you add a model -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ===== Create Appointment ===== -->
+        <section class="card">
+            <h2>Book Appointment</h2>
+            <form id="createForm">
+                <label for="patientId">Patient</label>
+                <select id="patientId" required>
+                    <option value="">-- Select Patient --</option>
+                    <option th:each="p : ${patients}" th:value="${p.id}" th:text="${p.firstName + ' ' + p.lastName}"></option>
+                </select>
+
+                <label for="doctorId">Doctor</label>
+                <select id="doctorId" required>
+                    <option value="">-- Select Doctor --</option>
+                    <option th:each="d : ${doctors}" th:value="${d.id}" th:text="${d.firstName + ' ' + d.lastName}"></option>
+                </select>
+
+                <div class="row">
+                    <div>
+                        <label for="time">Date & Time</label>
+                        <input id="time" type="datetime-local" required>
+                    </div>
+                    <div>
+                        <label for="notes">Notes</label>
+                        <input id="notes" placeholder="Optional">
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn btn-primary" type="submit">Book</button>
+                    <span id="createStatus" class="status"></span>
+                </div>
+            </form>
+        </section>
+    </div>
+</div>
+
+<script>
+    (function () {
+      // ------- Helpers -------
+      const $ = (id) => document.getElementById(id);
+      const tbody = () => document.querySelector('#apptTable tbody');
+
+      function setStatus(el, msg, type) {
+        if (!el) return;
+        el.textContent = msg || '';
+        el.className = 'status' + (type ? ' ' + type : '');
+      }
+
+      function fmt(dtIso) {
+        if (!dtIso) return '';
+        try {
+          return new Date(dtIso).toLocaleString();
+        } catch {
+          return dtIso;
+        }
+      }
+
+      function rowHtml(a) {
+        const patientName = a.patient?.firstName
+          ? `${a.patient.firstName} ${a.patient.lastName || ''}`.trim()
+          : (a.patientName || a.patientId);
+        const doctorName = a.doctor?.firstName
+          ? `${a.doctor.firstName} ${a.doctor.lastName || ''}`.trim()
+          : (a.doctorName || a.doctorId);
+
+        return `
+          <tr data-id="${a.id}">
+            <td>${a.id ?? ''}</td>
+            <td>${patientName ?? ''}</td>
+            <td>${doctorName ?? ''}</td>
+            <td>${fmt(a.appointmentDateTime)}</td>
+            <td><strong>${a.status || 'PENDING'}</strong></td>
+            <td>${a.notes ?? ''}</td>
+            <td>
+              <button class="btn btn-green" onclick="setStatusAppt(${a.id}, 'CONFIRMED')">Confirm</button>
+              <button class="btn btn-ghost" onclick="setStatusAppt(${a.id}, 'PENDING')">Pending</button>
+              <button class="btn btn-red" onclick="cancelAppt(${a.id})">Delete</button>
+            </td>
+          </tr>
+        `;
+      }
+
+      function render(list) {
+        const tb = tbody();
+        if (!tb) return;
+        tb.innerHTML = '';
+        (list || []).forEach(appt => tb.insertAdjacentHTML('beforeend', rowHtml(appt)));
+        const count = $('countPill');
+        if (count) count.textContent = (list || []).length + ' total';
+      }
+
+      // ------- Load by doctor & date range -------
+      async function load() {
+        const listStatus = $('listStatus');
+        const doctorId = $('filterDoctor')?.value || '';
+        const fromVal = $('fromDate')?.value ? new Date($('fromDate').value).toISOString() : '';
+        const toVal = $('toDate')?.value ? new Date($('toDate').value).toISOString() : '';
+
+        if (!doctorId) {
+          render([]);
+          setStatus(listStatus, 'Select a doctor to load appointments.');
+          return;
+        }
+
+        setStatus(listStatus, 'Loading...');
+        try {
+          const url = `/api/appointments?doctorId=${encodeURIComponent(doctorId)}`
+            + (fromVal ? `&from=${encodeURIComponent(fromVal)}` : '')
+            + (toVal ? `&to=${encodeURIComponent(toVal)}` : '');
+          const res = await fetch(url);
+          if (!res.ok) {
+            render([]);
+            setStatus(listStatus, 'No results or endpoint not implemented.', 'err');
+            return;
+          }
+          const data = await res.json();
+          render(Array.isArray(data) ? data : []);
+          setStatus(listStatus, '');
+        } catch (e) {
+          render([]);
+          setStatus(listStatus, 'Failed to load.', 'err');
+        }
+      }
+
+      // ------- Create -------
+      async function createAppointment(e) {
+        e.preventDefault();
+        const statusEl = $('createStatus');
+        setStatus(statusEl, 'Booking...');
+
+        const patientId = Number($('patientId')?.value || NaN);
+        const doctorId = Number($('doctorId')?.value || NaN);
+        const timeVal = $('time')?.value;
+
+        if (!patientId || !doctorId || !timeVal) {
+          setStatus(statusEl, 'Please select patient, doctor and time.', 'err');
+          return;
+        }
+
+        // Client-side future check to avoid 500 from backend
+        const chosen = new Date(timeVal);
+        const now = new Date();
+        if (isNaN(chosen.getTime()) || chosen <= now) {
+          setStatus(statusEl, 'Appointment time must be in the future.', 'err');
+          return;
+        }
+
+        const payload = {
+          patientId,
+          doctorId,
+          appointmentDateTime: new Date(timeVal).toISOString(),
+          notes: $('notes')?.value || ''
+        };
+
+        try {
+          const res = await fetch('/api/appointments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) {
+            const txt = await res.text();
+            setStatus(statusEl, 'Failed to book. ' + txt, 'err');
+            return;
+          }
+          setStatus(statusEl, 'Booked!', 'ok');
+
+          // If current filter is for same doctor, refresh list
+          if ($('filterDoctor')?.value && Number($('filterDoctor').value) === doctorId) {
+            load();
+          }
+          $('createForm')?.reset();
+        } catch (err) {
+          setStatus(statusEl, 'Server error. Try again.', 'err');
+        }
+      }
+
+      // ------- Update status -------
+      async function setStatusAppt(id, status) {
+        try {
+          const res = await fetch(`/api/appointments/${id}/status?status=${encodeURIComponent(status)}`, {
+            method: 'PATCH'
+          });
+          if (!res.ok) throw new Error(await res.text());
+
+          const row = document.querySelector(`#apptTable tbody tr[data-id="${id}"]`);
+          if (row) row.querySelector('td:nth-child(5)').innerHTML = `<strong>${status}</strong>`;
+        } catch (err) {
+          alert('Failed to update status');
+        }
+      }
+
+      // ------- Delete -------
+      async function cancelAppt(id) {
+        if (!confirm('Delete this appointment?')) return;
+        try {
+          const res = await fetch(`/api/appointments/${id}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error(await res.text());
+          const row = document.querySelector(`#apptTable tbody tr[data-id="${id}"]`);
+          if (row) row.remove();
+          const count = $('countPill');
+          if (count) count.textContent = document.querySelectorAll('#apptTable tbody tr').length + ' total';
+        } catch (err) {
+          alert('Failed to delete');
+        }
+      }
+
+      // ------- Wire up events once DOM is ready -------
+      document.addEventListener('DOMContentLoaded', () => {
+        // Set min attr on datetime to prevent choosing the past
+        const t = $('time');
+        if (t) {
+          const pad = (n) => String(n).padStart(2, '0');
+          const d = new Date();
+          const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          t.setAttribute('min', local);
+        }
+
+        $('loadBtn')?.addEventListener('click', load);
+        $('clearBtn')?.addEventListener('click', () => {
+          if ($('filterDoctor')) $('filterDoctor').value = '';
+          if ($('fromDate')) $('fromDate').value = '';
+          if ($('toDate')) $('toDate').value = '';
+          render([]);
+          setStatus($('listStatus'), '');
+        });
+
+        $('createForm')?.addEventListener('submit', createAppointment);
+      });
+
+      // Expose functions for inline buttons
+      window.setStatusAppt = setStatusAppt;
+      window.cancelAppt = cancelAppt;
+    })();
+</script>
+
+
+</body>
+</html>

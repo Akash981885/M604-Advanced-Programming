@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Medical Records</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0f172a; --card:#1f2937; --muted:#9ca3af; --text:#e5e7eb;
+      --accent:#22c55e; --border:#374151; --radius:12px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font-family:system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu;
+      padding:20px;
+    }
+    .wrap{max-width:1100px;margin:0 auto}
+    .card{
+      background:var(--card); padding:18px; border-radius:var(--radius);
+      border:1px solid var(--border); box-shadow:0 8px 20px rgba(0,0,0,0.35);
+    }
+    h2{margin:0 0 12px 0}
+    .row{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+    .col{flex:1}
+    label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}
+    select,input,textarea,button{
+      width:100%; padding:10px;border-radius:8px;border:1px solid var(--border);
+      background:#0b1220;color:var(--text);outline:none;
+    }
+    select:focus,input:focus,textarea:focus{border-color:var(--accent)}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    thead th{background:rgba(255,255,255,0.03);text-align:left;padding:10px;font-size:13px;color:var(--muted)}
+    tbody td{padding:10px;border-top:1px solid rgba(255,255,255,0.03);vertical-align:middle}
+    .small{font-size:13px;color:var(--muted)}
+    .actions{display:flex;gap:8px}
+    .btn{cursor:pointer;padding:8px 10px;border-radius:8px;border:none;font-weight:700}
+    .btn-primary{background:linear-gradient(180deg,var(--accent),#16a34a);color:#04260a}
+    .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+    .btn-danger{background:#ef4444;color:#fff}
+    .status{margin-left:8px;color:var(--muted);font-size:13px}
+    @media (max-width:880px){
+      .row{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h2>Medical Records</h2>
+
+    <div class="row" style="align-items:end">
+      <div style="width:260px">
+        <label for="filterPatient">Filter by Patient</label>
+        <select id="filterPatient">
+          <option value="">All patients</option>
+        </select>
+      </div>
+
+      <div class="col" style="max-width:320px">
+        <label for="qType">Filter by Type</label>
+        <select id="qType">
+          <option value="">All types</option>
+          <option value="Visit">Visit</option>
+          <option value="Prescription">Prescription</option>
+          <option value="Lab">Lab</option>
+          <option value="Diagnosis">Diagnosis</option>
+        </select>
+      </div>
+
+      <div style="width:180px">
+        <button id="loadBtn" class="btn btn-ghost">Load</button>
+      </div>
+
+      <div style="margin-left:auto;display:flex;align-items:center">
+        <div id="listStatus" class="status">—</div>
+      </div>
+    </div>
+
+    <div style="overflow:auto">
+      <table id="recordsTable" aria-live="polite">
+        <thead>
+        <tr>
+          <th style="width:60px">ID</th>
+          <th>Patient</th>
+          <th>Type</th>
+          <th style="width:180px">Date</th>
+          <th>Summary</th>
+          <th style="width:160px">Actions</th>
+        </tr>
+        </thead>
+        <tbody id="recordsBody">
+        <!-- populated by JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <hr style="margin:18px 0;border-color:rgba(255,255,255,0.03)">
+
+    <h3 style="margin-top:0">Add Record</h3>
+    <form id="addRecord" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <label for="rPatientId">Patient</label>
+        <select id="rPatientId" required>
+          <option value="">Select patient</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="rType">Type</label>
+        <input id="rType" placeholder="e.g., Visit, Prescription" required/>
+      </div>
+
+      <div>
+        <label for="rDate">Date</label>
+        <input id="rDate" type="date" required/>
+      </div>
+
+      <div>
+        <label for="rTitle">Title / Short Summary</label>
+        <input id="rTitle" placeholder="Short title" required/>
+      </div>
+
+      <div style="grid-column:1 / -1">
+        <label for="rDesc">Description / Notes</label>
+        <textarea id="rDesc" rows="4" placeholder="Detailed notes (optional)"></textarea>
+      </div>
+
+      <div style="grid-column:1 / -1;display:flex;gap:8px;align-items:center">
+        <button type="submit" class="btn btn-primary">Save Record</button>
+        <button type="button" id="resetBtn" class="btn btn-ghost">Reset</button>
+        <div id="addStatus" class="status" style="margin-left:8px">—</div>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+<script>
+  // Utility: normalize API results to an array
+  function toList(data) {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.content)) return data.content;
+    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data.records)) return data.records;
+    return [];
+  }
+
+  // Populate patient selects (filter + add form)
+  async function populatePatients() {
+    const filter = document.getElementById('filterPatient');
+    const rsel = document.getElementById('rPatientId');
+    try {
+      const res = await fetch('/api/patients');
+      if (!res.ok) {
+        // Try paginated endpoint
+        const alt = await fetch('/api/patients?page=0&size=100');
+        if (!alt.ok) throw new Error('No patients');
+        const altData = await alt.json();
+        const arr = toList(altData);
+        fillPatientOptions(filter, rsel, arr);
+        return;
+      }
+      const data = await res.json();
+      const arr = toList(data);
+      fillPatientOptions(filter, rsel, arr);
+    } catch (e) {
+      console.warn('populatePatients failed', e);
+      // leave default placeholder
+    }
+  }
+
+  function fillPatientOptions(filterEl, addEl, patients) {
+    // Clear but keep first placeholder
+    const placeholder = filterEl.querySelector('option[value=""]')?.outerHTML || '<option value="">All patients</option>';
+    filterEl.innerHTML = placeholder;
+    addEl.innerHTML = '<option value="">Select patient</option>';
+    patients.forEach(p => {
+      const txt = `${p.firstName || ''} ${p.lastName || ''}`.trim() || `#${p.id}`;
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = txt;
+      filterEl.appendChild(opt.cloneNode(true));
+      addEl.appendChild(opt);
+    });
+  }
+
+  // Load records (with optional filters)
+  async function loadRecords() {
+    const statusEl = document.getElementById('listStatus');
+    statusEl.textContent = 'Loading...';
+    const filterPatient = document.getElementById('filterPatient').value;
+    const qType = document.getElementById('qType').value;
+
+    // Build query params if backend supports filtering via query
+    const params = new URLSearchParams();
+    if (filterPatient) params.set('patientId', filterPatient);
+    if (qType) params.set('type', qType);
+
+    // Try endpoint variants. First try /api/medical-records with filters
+    const urls = [
+      `/api/medical-records?${params.toString()}`,
+      `/api/medical-records`,
+      `/api/patients/${filterPatient || ''}/records` // if patient-specific endpoint exists
+    ].filter(Boolean);
+
+    let list = [];
+    for (const url of urls) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const data = await res.json();
+        list = toList(data);
+        // if we got results or an empty array, break (we got a usable response)
+        if (Array.isArray(list)) break;
+      } catch (e) {
+        // try next
+      }
+    }
+
+    // If server returned single object (not array), attempt to convert if it has 'content'
+    if (!Array.isArray(list)) list = [];
+
+    // Apply client-side filters if server didn't support them
+    const patientFilter = filterPatient ? String(filterPatient) : '';
+    const typeFilter = qType ? String(qType).toLowerCase() : '';
+    if (patientFilter) {
+      list = list.filter(r => String(r.patient?.id || r.patientId || '').toLowerCase() === patientFilter.toLowerCase());
+    }
+    if (typeFilter) {
+      list = list.filter(r => String(r.type || '').toLowerCase() === typeFilter);
+    }
+
+    // Render table
+    const tbody = document.getElementById('recordsBody');
+    tbody.innerHTML = '';
+    if (!list || list.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="small">No records found.</td></tr>`;
+      statusEl.textContent = 'No records';
+      return;
+    }
+
+    list.forEach(r => {
+      const tr = document.createElement('tr');
+
+      const patientName = r.patient?.firstName ? `${r.patient.firstName} ${r.patient.lastName || ''}`.trim() : (r.patientName || ('#' + (r.patientId || '')));
+      const dateStr = r.recordDate ? new Date(r.recordDate).toLocaleString() : (r.recordDate || '-');
+      const summary = r.title || r.description || r.summary || '-';
+
+      tr.innerHTML = `
+        <td>${r.id ?? ''}</td>
+        <td>${escapeHtml(patientName)}</td>
+        <td>${escapeHtml(r.type || '-')}</td>
+        <td>${escapeHtml(dateStr)}</td>
+        <td>${escapeHtml(summary)}</td>
+        <td class="actions">
+          <button class="btn btn-ghost" data-id="${r.id}" onclick="viewRecord(${r.id})">View</button>
+          <button class="btn btn-ghost" data-id="${r.id}" onclick="editRecord(${r.id})">Edit</button>
+          <button class="btn btn-danger" data-id="${r.id}" onclick="deleteRecord(${r.id})">Delete</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    statusEl.textContent = `${list.length} record(s)`;
+  }
+
+  // Escape helper for safety
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
+
+  // Add record: try two POST patterns (patient-specific then generic)
+  async function submitRecord(e) {
+    e.preventDefault();
+    const addStatus = document.getElementById('addStatus');
+    addStatus.textContent = 'Saving...';
+
+    const patientId = document.getElementById('rPatientId').value;
+    if (!patientId) { addStatus.textContent = 'Please choose a patient.'; return; }
+
+    const payload = {
+      patientId: Number(patientId),
+      type: document.getElementById('rType').value || null,
+      title: document.getElementById('rTitle').value || null,
+      description: document.getElementById('rDesc').value || null,
+      recordDate: document.getElementById('rDate').value ? new Date(document.getElementById('rDate').value).toISOString() : null
+    };
+
+    // Try patient-specific endpoint first
+    const patientUrl = `/api/patients/${patientId}/records`;
+    const genericUrl = `/api/medical-records`;
+
+    try {
+      // try patient-specific
+      let res = await fetch(patientUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        // fallback generic
+        res = await fetch(genericUrl, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+      }
+      if (!res.ok) {
+        const txt = await res.text().catch(()=>null);
+        throw new Error(txt || 'Failed to create record');
+      }
+      addStatus.textContent = 'Saved';
+      document.getElementById('addRecord').reset();
+      loadRecords();
+    } catch (err) {
+      console.error(err);
+      addStatus.textContent = 'Failed to save: ' + (err.message || '');
+    } finally {
+      setTimeout(()=>{ addStatus.textContent = '—'; }, 3000);
+    }
+  }
+
+  // Delete record
+  async function deleteRecord(id) {
+    if (!confirm('Delete this record?')) return;
+    try {
+      const res = await fetch(`/api/medical-records/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+      loadRecords();
+    } catch (err) {
+      alert('Failed to delete: ' + (err.message||''));
+    }
+  }
+
+  // Placeholder view/edit functions (expandable)
+  function viewRecord(id) {
+    // can open modal or navigate to patient profile
+    window.location.href = `/patient?id=${encodeURIComponent(id)}`; // adjust if needed
+  }
+  function editRecord(id) {
+    // keep simple: navigate to patient profile or edit page
+    window.location.href = `/medical-records/edit/${id}`; // implement server-side if needed
+  }
+
+  // Wire up events
+  document.addEventListener('DOMContentLoaded', () => {
+    populatePatients();
+    document.getElementById('loadBtn').addEventListener('click', loadRecords);
+    document.getElementById('filterPatient').addEventListener('change', loadRecords);
+    document.getElementById('qType').addEventListener('change', loadRecords);
+    document.getElementById('addRecord').addEventListener('submit', submitRecord);
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      document.getElementById('addRecord').reset();
+      document.getElementById('addStatus').textContent = '—';
+    });
+
+    // initial load
+    loadRecords();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="utf-8"/><title>Dashboard</title>
+  <style>body{background:#0f172a;color:#e5e7eb;font-family:system-ui;padding:22px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card{background:#1f2937;padding:16px;border-radius:12px}</style>
+</head>
+<body>
+<h1>Clinician Dashboard</h1>
+<div class="grid">
+  <div class="card"><h3>Total Patients</h3><div id="totPatients">—</div></div>
+  <div class="card"><h3>Total Doctors</h3><div id="totDoctors">—</div></div>
+  <div class="card"><h3>Today's Appointments</h3><div id="todays">—</div></div>
+</div>
+
+<div style="margin-top:18px" class="card">
+  <h3>Upcoming Appointments</h3>
+  <table id="upcoming"><thead><tr><th>Time</th><th>Patient</th><th>Doctor</th><th>Status</th></tr></thead><tbody></tbody></table>
+</div>
+
+<script>
+  (async ()=>{
+    const $=(id)=>document.getElementById(id);
+    async function loadStats(){
+      // backend endpoints: /api/stats/summary or simple fetch separate counts
+      const resP = await fetch('/api/stats/patients'); const p = await resP.json();
+      const resD = await fetch('/api/stats/doctors'); const d = await resD.json();
+      const resA = await fetch('/api/appointments/today'); const a = await resA.json();
+      $('totPatients').textContent = p.count;
+      $('totDoctors').textContent = d.count;
+      $('todays').textContent = a.length;
+      const tbody=document.querySelector('#upcoming tbody'); tbody.innerHTML='';
+      a.slice(0,20).forEach(ap=> tbody.insertAdjacentHTML('beforeend', `<tr><td>${new Date(ap.appointmentDateTime).toLocaleString()}</td><td>${ap.patient.firstName||ap.patientId}</td><td>${ap.doctor.firstName||ap.doctorId}</td><td>${ap.status}</td></tr>`));
+    }
+    await loadStats();
+  })();
+</script>
+</body>
+</html>

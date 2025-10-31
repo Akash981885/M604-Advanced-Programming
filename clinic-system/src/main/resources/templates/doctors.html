@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Doctors</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <style>
+        :root{
+          --bg:#0f172a; --panel:#111827; --card:#1f2937; --text:#e5e7eb; --muted:#9ca3af;
+          --accent:#22c55e; --accent-dark:#16a34a; --danger:#ef4444; --blue:#3b82f6;
+          --border:#374151; --shadow:0 10px 25px rgba(0,0,0,.35),0 4px 10px rgba(0,0,0,.2);
+          --radius:14px;
+        }
+        *{box-sizing:border-box}
+        body{margin:0;background:var(--bg);color:var(--text);min-height:100vh;padding:32px 18px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Helvetica Neue,Arial}
+        .container{max-width:1100px;margin:auto}
+        .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+        .title{font-size:28px;font-weight:800}
+        .nav a{color:var(--muted);margin-left:16px;text-decoration:none;font-weight:600}
+        .nav a:hover{color:var(--text)}
+        .grid{display:grid;grid-template-columns:1.6fr .9fr;gap:18px}
+        @media(max-width:980px){.grid{grid-template-columns:1fr}}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+        h2{margin:0 0 12px 0}
+        table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--border);background:rgba(31,41,55,.6);border-radius:12px;overflow:hidden}
+        thead th{padding:12px;background:rgba(55,65,81,.6);color:var(--muted);text-align:left}
+        tbody td{padding:12px;border-bottom:1px solid var(--border)}
+        tbody tr:hover{background:rgba(55,65,81,.25)}
+        .btn{border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px}
+        .btn-edit{background:var(--blue);color:#fff}
+        .btn-delete{background:var(--danger);color:#fff}
+        .btn-toggle{background:#eab308;color:#001a09}
+        .btn-primary{background:var(--accent);color:#001a09}
+        input,select{width:100%;padding:10px;border-radius:10px;background:var(--panel);color:var(--text);border:1px solid var(--border)}
+        input:focus,select:focus{border-color:var(--accent);outline:none}
+        label{display:block;margin:10px 0 6px;color:var(--muted)}
+        .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        @media(max-width:620px){.row{grid-template-columns:1fr}}
+        .actions{margin-top:14px;display:flex;gap:10px;align-items:center}
+        .status{font-size:13px;color:var(--muted);min-height:18px}
+        .status.ok{color:#86efac}
+        .status.err{color:#fca5a5}
+        .pill{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:rgba(156,163,175,.12);font-size:12px}
+        .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+        .toolbar input, .toolbar select{width:auto}
+        /* Modal */
+        #editModal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center}
+        #editModal .content{background:var(--card);padding:20px;border-radius:14px;width:360px;box-shadow:var(--shadow)}
+        #editModal h3{margin-top:0}
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <div class="title">Doctors</div>
+        <div class="nav">
+            <a href="/">Home</a>
+            <a href="/patients">Patients</a>
+            <a href="/appointments">Appointments</a>
+            <a href="/swagger-ui.html">API Docs</a>
+        </div>
+    </div>
+
+    <div class="grid">
+        <!-- ===== Doctors List ===== -->
+        <section class="card">
+            <h2>Doctor List <span class="pill" id="countPill">—</span></h2>
+
+            <div class="toolbar">
+                <input id="specialityFilter" placeholder="Filter by speciality"/>
+                <button class="btn btn-primary" id="filterBtn">Filter</button>
+                <button class="btn" id="clearBtn">Clear</button>
+                <span class="status" id="listStatus"></span>
+            </div>
+
+            <div style="overflow:auto">
+                <table id="doctorsTable">
+                    <thead>
+                    <tr>
+                        <th>ID</th><th>Name</th><th>Speciality</th><th>Email</th><th>Phone</th><th>Active</th><th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <!-- Initial rows rendered by Thymeleaf if model 'doctors' exists -->
+                    <tr th:each="d : ${doctors}">
+                        <td th:text="${d.id}"></td>
+                        <td th:text="${d.firstName + ' ' + d.lastName}"></td>
+                        <td th:text="${d.speciality}"></td>
+                        <td th:text="${d.email}"></td>
+                        <td th:text="${d.phone}"></td>
+                        <td>
+                            <span th:text="${d.active} ? 'Yes' : 'No'">Yes</span>
+                        </td>
+                        <td>
+                            <button class="btn btn-edit" th:onclick="'openEdit(' + ${d.id} + ')'">Edit</button>
+                            <button class="btn btn-delete" th:onclick="'removeDoctor(' + ${d.id} + ')'">Delete</button>
+                            <button class="btn btn-toggle" th:onclick="'toggleActive(' + ${d.id} + ')'">Toggle</button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ===== Create Doctor ===== -->
+        <section class="card">
+            <h2>Add New Doctor</h2>
+            <form id="addForm">
+                <div class="row">
+                    <div>
+                        <label>First Name</label>
+                        <input id="firstName" required>
+                    </div>
+                    <div>
+                        <label>Last Name</label>
+                        <input id="lastName" required>
+                    </div>
+                </div>
+                <div class="row">
+                    <div>
+                        <label>Speciality</label>
+                        <input id="speciality" required placeholder="Cardiology, Dermatology..." />
+                    </div>
+                    <div>
+                        <label>Email</label>
+                        <input id="email" type="email" required />
+                    </div>
+                </div>
+                <div class="row">
+                    <div>
+                        <label>Phone</label>
+                        <input id="phone" />
+                    </div>
+                    <div>
+                        <label>Active</label>
+                        <select id="active">
+                            <option value="true" selected>Yes</option>
+                            <option value="false">No</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-primary" type="submit">Add Doctor</button>
+                    <span id="createStatus" class="status"></span>
+                </div>
+            </form>
+        </section>
+    </div>
+</div>
+
+<!-- ===== EDIT MODAL ===== -->
+<div id="editModal">
+    <div class="content">
+        <h3>Edit Doctor</h3>
+        <div class="row">
+            <div>
+                <label>First Name</label>
+                <input id="eFirstName">
+            </div>
+            <div>
+                <label>Last Name</label>
+                <input id="eLastName">
+            </div>
+        </div>
+        <div class="row">
+            <div>
+                <label>Speciality</label>
+                <input id="eSpeciality">
+            </div>
+            <div>
+                <label>Email</label>
+                <input id="eEmail" type="email">
+            </div>
+        </div>
+        <div class="row">
+            <div>
+                <label>Phone</label>
+                <input id="ePhone">
+            </div>
+            <div>
+                <label>Active</label>
+                <select id="eActive">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </select>
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn btn-primary" onclick="saveEdit()">Update</button>
+            <button class="btn" onclick="closeModal()">Cancel</button>
+        </div>
+        <span id="editStatus" class="status"></span>
+    </div>
+</div>
+
+<script>
+    // ===== Helpers =====
+    const $ = (id) => document.getElementById(id);
+    const tableBody = () => document.querySelector('#doctorsTable tbody');
+
+    function setStatus(el, msg, type){
+      el.textContent = msg || '';
+      el.className = 'status' + (type ? ' ' + type : '');
+    }
+
+    function rowHtml(d){
+      const fullName = [d.firstName, d.lastName].filter(Boolean).join(' ');
+      return `
+        <tr data-id="${d.id}">
+          <td>${d.id ?? ''}</td>
+          <td>${fullName}</td>
+          <td>${d.speciality ?? ''}</td>
+          <td>${d.email ?? ''}</td>
+          <td>${d.phone ?? ''}</td>
+          <td>${d.active ? 'Yes' : 'No'}</td>
+          <td>
+            <button class="btn btn-edit" onclick="openEdit(${d.id})">Edit</button>
+            <button class="btn btn-delete" onclick="removeDoctor(${d.id})">Delete</button>
+            <button class="btn btn-toggle" onclick="toggleActive(${d.id})">Toggle</button>
+          </td>
+        </tr>
+      `;
+    }
+
+    function renderList(list){
+      const tbody = tableBody();
+      tbody.innerHTML = '';
+      list.forEach(d => tbody.insertAdjacentHTML('beforeend', rowHtml(d)));
+      $('countPill').textContent = list.length + ' total';
+    }
+
+    // ===== Load doctors (active or by speciality) =====
+    async function loadDoctors(){
+      const speciality = $('specialityFilter').value.trim();
+      const url = speciality ? `/api/doctors?speciality=${encodeURIComponent(speciality)}` : '/api/doctors';
+      setStatus($('listStatus'), 'Loading...');
+      const res = await fetch(url);
+      const data = await res.json();
+      renderList(data);
+      setStatus($('listStatus'), '');
+    }
+
+    // Initial hydrate: if Thymeleaf didn't pass doctors, fetch them
+    window.addEventListener('DOMContentLoaded', () => {
+      const existingRows = tableBody().querySelectorAll('tr').length;
+      if (existingRows === 0) loadDoctors();
+    });
+
+    $('filterBtn').addEventListener('click', loadDoctors);
+    $('clearBtn').addEventListener('click', () => { $('specialityFilter').value=''; loadDoctors(); });
+
+    // ===== Create =====
+    $('addForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      setStatus($('createStatus'), 'Saving...');
+      const payload = {
+        firstName: $('firstName').value.trim(),
+        lastName: $('lastName').value.trim(),
+        speciality: $('speciality').value.trim(),
+        email: $('email').value.trim(),
+        phone: $('phone').value.trim() || null,
+        active: $('active').value === 'true'
+      };
+      try{
+        const res = await fetch('/api/doctors', {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        });
+        if(!res.ok) throw new Error(await res.text());
+        const saved = await res.json();
+        tableBody().insertAdjacentHTML('beforeend', rowHtml(saved));
+        setStatus($('createStatus'), 'Doctor added.', 'ok');
+        e.target.reset();
+        loadDoctors(); // refresh to ensure consistency
+      }catch(err){
+        setStatus($('createStatus'), 'Failed to add. ' + (err.message || ''), 'err');
+      }
+    });
+
+    // ===== Edit (open modal) =====
+    let editingId = null;
+    async function openEdit(id){
+      editingId = id;
+      setStatus($('editStatus'), 'Loading...');
+      const res = await fetch(`/api/doctors/${id}`);
+      const d = await res.json();
+      $('eFirstName').value = d.firstName || '';
+      $('eLastName').value  = d.lastName || '';
+      $('eSpeciality').value= d.speciality || '';
+      $('eEmail').value     = d.email || '';
+      $('ePhone').value     = d.phone || '';
+      $('eActive').value    = d.active ? 'true' : 'false';
+      $('editModal').style.display='flex';
+      setStatus($('editStatus'), '');
+    }
+    function closeModal(){ $('editModal').style.display='none'; }
+
+    // ===== Update =====
+    async function saveEdit(){
+      if(!editingId) return;
+      setStatus($('editStatus'), 'Updating...');
+      const payload = {
+        firstName: $('eFirstName').value.trim(),
+        lastName:  $('eLastName').value.trim(),
+        speciality:$('eSpeciality').value.trim(),
+        email:     $('eEmail').value.trim(),
+        phone:     $('ePhone').value.trim() || null,
+        active:    $('eActive').value === 'true'
+      };
+      try{
+        const res = await fetch(`/api/doctors/${editingId}`, {
+          method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        });
+        if(!res.ok) throw new Error(await res.text());
+        setStatus($('editStatus'), 'Updated.', 'ok');
+        closeModal();
+        loadDoctors();
+      }catch(err){
+        setStatus($('editStatus'), 'Failed to update. ' + (err.message||''), 'err');
+      }
+    }
+
+    // ===== Delete =====
+    async function removeDoctor(id){
+      if(!confirm('Delete this doctor?')) return;
+      await fetch(`/api/doctors/${id}`, { method:'DELETE' });
+      // Remove row immediately
+      const row = tableBody().querySelector(`tr[data-id="${id}"]`);
+      if(row) row.remove();
+      loadDoctors();
+    }
+
+    // ===== Toggle Active (convenience) =====
+    async function toggleActive(id){
+      // Load current
+      const d = await (await fetch(`/api/doctors/${id}`)).json();
+      const payload = {
+        firstName: d.firstName, lastName: d.lastName, speciality: d.speciality,
+        email: d.email, phone: d.phone, active: !d.active
+      };
+      await fetch(`/api/doctors/${id}`, {
+        method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      loadDoctors();
+    }
+
+    // Expose for button onclick
+    window.openEdit = openEdit;
+    window.closeModal = closeModal;
+    window.saveEdit = saveEdit;
+    window.removeDoctor = removeDoctor;
+    window.toggleActive = toggleActive;
+</script>
+</body>
+</html>
